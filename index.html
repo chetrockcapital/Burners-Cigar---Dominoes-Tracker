@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Dominos Tracker</title>
+<style>
+:root{--bg:#0f0f1a;--card:#1a1a2e;--card2:#16213e;--accent:#e94560;--accent2:#0f3460;--text:#eaeaea;--muted:#888;--green:#2ecc71;--yellow:#f1c40f;--red:#e74c3c;--purple:#9b59b6;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;min-height:100vh;}
+#setupScreen{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:10000;}
+.setupBox{background:var(--card);border-radius:16px;padding:32px;width:min(480px,95vw);border:1px solid var(--accent2);}
+.setupBox h2{color:var(--accent);margin-bottom:6px;font-size:1.4rem;}
+.setupBox p{color:var(--muted);font-size:0.85rem;margin-bottom:20px;line-height:1.5;}
+.setupField{margin-bottom:14px;}
+.setupField label{display:block;font-size:0.8rem;color:var(--muted);margin-bottom:4px;}
+.setupField input{width:100%;background:var(--card2);border:1px solid var(--accent2);color:var(--text);border-radius:8px;padding:9px 12px;font-size:0.9rem;}
+.setupField input:focus{outline:none;border-color:var(--accent);}
+.setupNote{background:var(--accent2);border-radius:8px;padding:12px;font-size:0.8rem;color:var(--text);margin-bottom:16px;line-height:1.6;}
+.setupNote code{background:rgba(0,0,0,0.3);padding:1px 5px;border-radius:4px;font-family:monospace;color:var(--yellow);}
+#pinOverlay{position:fixed;inset:0;background:rgba(0,0,0,0.95);display:flex;align-items:center;justify-content:center;z-index:9999;}
+.pinBox{background:var(--card);border-radius:16px;padding:32px;width:320px;text-align:center;border:1px solid var(--accent2);}
+.pinBox h2{color:var(--accent);margin-bottom:8px;font-size:1.4rem;}
+.pinBox p{color:var(--muted);margin-bottom:20px;font-size:0.9rem;}
+.pinDots{display:flex;justify-content:center;gap:12px;margin-bottom:20px;}
+.pinDot{width:14px;height:14px;border-radius:50%;border:2px solid var(--muted);background:transparent;transition:0.2s;}
+.pinDot.filled{background:var(--accent);border-color:var(--accent);}
+.pinPad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+.pinBtn{background:var(--card2);border:1px solid var(--accent2);color:var(--text);border-radius:10px;padding:16px;font-size:1.2rem;cursor:pointer;transition:0.15s;}
+.pinBtn:hover{background:var(--accent2);}
+.pinBtn.del{color:var(--accent);}
+.pinError{color:var(--red);font-size:0.85rem;margin-top:10px;min-height:20px;}
+.pinRoles{display:flex;gap:10px;margin-bottom:20px;}
+.roleBtn{flex:1;padding:10px;border-radius:8px;border:2px solid var(--accent2);background:transparent;color:var(--muted);cursor:pointer;font-size:0.9rem;transition:0.2s;}
+.roleBtn.active{border-color:var(--accent);color:var(--text);background:var(--accent2);}
+#loadingBar{position:fixed;top:0;left:0;height:3px;background:var(--accent);width:0%;transition:width 0.3s;z-index:99999;}
+.tabBar{display:flex;background:var(--card);border-bottom:2px solid var(--accent2);position:sticky;top:0;z-index:100;}
+.tabBtn{flex:1;padding:14px 8px;background:none;border:none;color:var(--muted);font-size:0.9rem;cursor:pointer;transition:0.2s;border-bottom:3px solid transparent;}
+.tabBtn.active{color:var(--accent);border-bottom-color:var(--accent);}
+.tabContent{display:none;padding:16px;max-width:900px;margin:0 auto;}
+.tabContent.active{display:block;}
+.card{background:var(--card);border-radius:12px;padding:16px;margin-bottom:16px;border:1px solid var(--accent2);}
+.card h3{color:var(--accent);margin-bottom:12px;font-size:1rem;}
+.btn{padding:10px 18px;border-radius:8px;border:none;cursor:pointer;font-size:0.9rem;font-weight:600;transition:0.2s;}
+.btn-primary{background:var(--accent);color:white;}
+.btn-primary:hover{background:#c73652;}
+.btn-secondary{background:var(--accent2);color:white;}
+.btn-secondary:hover{background:#1a4a80;}
+.btn-green{background:var(--green);color:#000;}
+.btn-yellow{background:var(--yellow);color:#000;}
+.btn-red{background:var(--red);color:white;}
+.btn-sm{padding:6px 12px;font-size:0.8rem;}
+.btn:disabled{opacity:0.4;cursor:not-allowed;}
+input,select{background:var(--card2);border:1px solid var(--accent2);color:var(--text);border-radius:8px;padding:8px 12px;font-size:0.9rem;width:100%;}
+input:focus,select:focus{outline:none;border-color:var(--accent);}
+.seatGrid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.seat{background:var(--card2);border-radius:10px;padding:14px;border:2px solid var(--accent2);position:relative;}
+.seat.winner{border-color:var(--yellow);box-shadow:0 0 20px rgba(241,196,15,0.3);}
+.seat.lowman{border-color:var(--red);}
+.seatName{font-weight:700;font-size:1rem;margin-bottom:4px;}
+.seatScore{font-size:2rem;font-weight:900;color:var(--accent);}
+.seatBadge{position:absolute;top:8px;right:8px;font-size:0.7rem;padding:2px 6px;border-radius:10px;font-weight:700;}
+.badge-low{background:var(--red);color:white;}
+.badge-hold{background:var(--purple);color:white;}
+.badge-winner{background:var(--yellow);color:#000;}
+.scoreInput{display:flex;gap:8px;margin-top:8px;}
+.scoreInput input{width:70px;text-align:center;}
+.waitList{display:flex;flex-wrap:wrap;gap:8px;}
+.waitChip{background:var(--accent2);border-radius:20px;padding:4px 12px;font-size:0.85rem;display:flex;align-items:center;gap:6px;}
+.filterRow{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:16px;}
+.filterRow label{font-size:0.8rem;color:var(--muted);display:block;margin-bottom:4px;}
+.filterGroup{display:flex;flex-direction:column;}
+table{width:100%;border-collapse:collapse;font-size:0.88rem;}
+th{background:var(--accent2);color:var(--text);padding:10px 8px;text-align:left;cursor:pointer;user-select:none;white-space:nowrap;}
+th:hover{background:#1a5080;}
+th .sortArrow{margin-left:4px;color:var(--accent);}
+td{padding:9px 8px;border-bottom:1px solid #222;}
+tr:hover td{background:rgba(255,255,255,0.03);}
+.playerDot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;}
+.calHeader{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
+.calHeader h2{font-size:1.2rem;}
+.calGrid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;}
+.calDayLabel{text-align:center;font-size:0.75rem;color:var(--muted);padding:4px;}
+.calCell{background:var(--card2);border-radius:8px;min-height:80px;padding:6px;border:1px solid #222;cursor:pointer;transition:0.15s;}
+.calCell:hover{border-color:var(--accent);}
+.calCell.empty{background:transparent;border-color:transparent;cursor:default;}
+.calCell.today{border-color:var(--accent);}
+.calDayNum{font-size:0.8rem;color:var(--muted);margin-bottom:4px;}
+.calWinner{font-size:0.7rem;padding:2px 5px;border-radius:4px;margin-bottom:2px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#000;}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;z-index:500;}
+.modalBox{background:var(--card);border-radius:14px;padding:24px;width:90%;max-width:480px;max-height:80vh;overflow-y:auto;border:1px solid var(--accent2);}
+.modalBox h3{color:var(--accent);margin-bottom:16px;}
+.modalClose{float:right;background:none;border:none;color:var(--muted);font-size:1.4rem;cursor:pointer;margin-top:-4px;}
+.playerList{display:flex;flex-direction:column;gap:8px;}
+.playerRow{display:flex;align-items:center;gap:10px;background:var(--card2);border-radius:8px;padding:10px;}
+.colorPicker{width:36px;height:36px;border-radius:50%;border:none;cursor:pointer;padding:2px;}
+#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--green);color:#000;padding:10px 24px;border-radius:20px;font-weight:700;z-index:9998;opacity:0;transition:opacity 0.3s;pointer-events:none;white-space:nowrap;}
+#toast.show{opacity:1;}
+#winnerBanner{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.92);align-items:center;justify-content:center;z-index:800;flex-direction:column;}
+#winnerBanner.show{display:flex;}
+#winnerBanner h1{font-size:3rem;color:var(--yellow);text-align:center;}
+#winnerBanner p{color:var(--muted);margin-top:10px;}
+#syncDot{position:fixed;top:8px;right:12px;width:10px;height:10px;border-radius:50%;background:var(--muted);z-index:200;transition:0.3s;}
+#syncDot.synced{background:var(--green);}
+#syncDot.syncing{background:var(--yellow);}
+#syncDot.error{background:var(--red);}
+.flex{display:flex;gap:10px;}
+.flex-wrap{flex-wrap:wrap;}
+.mt{margin-top:10px;}
+.mb{margin-bottom:10px;}
+.text-muted{color:var(--muted);font-size:0.85rem;}
+.w-full{width:100%;}
+@media(max-width:500px){.seatGrid{grid-template-columns:1fr;}.calCell{min-height:60px;}.setupBox{padding:20px;}}
+</style>
+</head>
+<body>
+<div id="loadingBar"></div>
+<div id="syncDot" title="Firebase sync status"></div>
+
+<div id="setupScreen" style="display:none;">
+  <div class="setupBox">
+    <h2>&#128293; Firebase Setup</h2>
+    <p>Connect your Firebase Realtime Database to enable live sync across all devices.</p>
+    <div class="setupNote">
+      <strong>How to get your config:</strong><br>
+      1. Go to <code>console.firebase.google.com</code><br>
+      2. Create a project &#8594; Add Web App<br>
+      3. Copy the config values below<br>
+      4. In Firebase console: Build &#8594; Realtime Database &#8594; Create database<br>
+      5. Set rules to <code>{ "rules": { ".read": true, ".write": true } }</code>
+    </div>
+    <div class="setupField"><label>API Key</label><input type="text" id="cfg_apiKey" placeholder="AIzaSy..."/></div>
+    <div class="setupField"><label>Auth Domain</label><input type="text" id="cfg_authDomain" placeholder="your-app.firebaseapp.com"/></div>
+    <div class="setupField"><label>Database URL</label><input type="text" id="cfg_databaseURL" placeholder="https://your-app-default-rtdb.firebaseio.com"/></div>
+    <div class="setupField"><label>Project ID</label><input type="text" id="cfg_projectId" placeholder="your-app"/></div>
+    <div class="setupField"><label>App ID</label><input type="text" id="cfg_appId" placeholder="1:123456:web:abc123"/></div>
+    <div id="setupError" style="color:var(--red);font-size:0.85rem;margin-bottom:10px;"></div>
+    <button class="btn btn-primary w-full" onclick="saveFirebaseConfig()">&#128640; Connect &amp; Launch</button>
+  </div>
+</div>
+
+<div id="pinOverlay" style="display:none;">
+  <div class="pinBox">
+    <h2>&#127183; Dominos Tracker</h2>
+    <p>Select your role to continue</p>
+    <div class="pinRoles">
+      <button class="roleBtn active" id="roleAdmin" onclick="selectRole('admin')">&#128273; Admin</button>
+      <button class="roleBtn" id="roleUser" onclick="selectRole('user')">&#128100; Player</button>
+    </div>
+    <div class="pinDots">
+      <div class="pinDot" id="d0"></div><div class="pinDot" id="d1"></div>
+      <div class="pinDot" id="d2"></div><div class="pinDot" id="d3"></div>
+      <div class="pinDot" id="d4"></div>
+    </div>
+    <div class="pinPad">
+      <button class="pinBtn" onclick="pinPress('1')">1</button>
+      <button class="pinBtn" onclick="pinPress('2')">2</button>
+      <button class="pinBtn" onclick="pinPress('3')">3</button>
+      <button class="pinBtn" onclick="pinPress('4')">4</button>
+      <button class="pinBtn" onclick="pinPress('5')">5</button>
+      <button class="pinBtn" onclick="pinPress('6')">6</button>
+      <button class="pinBtn" onclick="pinPress('7')">7</button>
+      <button class="pinBtn" onclick="pinPress('8')">8</button>
+      <button class="pinBtn" onclick="pinPress('9')">9</button>
+      <button class="pinBtn" onclick="pinPress('0')">0</button>
+      <button class="pinBtn del" onclick="pinDel()">&#9003;</button>
+      <button class="pinBtn del" onclick="pinClear()">&#10005;</button>
+    </div>
+    <div class="pinError" id="pinError"></div>
+    <button class="btn btn-secondary btn-sm mt" onclick="reconfigureFirebase()" style="width:100%;margin-top:12px;">&#128295; Change Firebase Config</button>
+  </div>
+</div>
+
+<div id="app" style="display:none;">
+  <div class="tabBar">
+    <button class="tabBtn active" id="tabBtnGame" onclick="showTab('game',this)">&#127918; Game</button>
+    <button class="tabBtn" id="tabBtnStats" onclick="showTab('stats',this)">&#128202; Stats</button>
+    <button class="tabBtn" id="tabBtnCalendar" onclick="showTab('calendar',this)">&#128197; Calendar</button>
+    <button class="tabBtn" id="tabBtnAdmin" onclick="showTab('admin',this)" style="display:none;">&#9881;&#65039; Admin</button>
+  </div>
+
+  <div id="tab-game" class="tabContent active">
+    <div class="card">
+      <h3>&#127918; Active Game</h3>
+      <div id="seatSetup">
+        <p class="text-muted mb">Select up to 4 players for this game:</p>
+        <div id="seatPicker" class="flex flex-wrap mb"></div>
+        <button class="btn btn-primary" onclick="startGame()">&#9654; Start Game</button>
+      </div>
+      <div id="gameBoard" style="display:none;">
+        <div class="seatGrid" id="seatsGrid"></div>
+        <div class="flex mt" style="flex-wrap:wrap;gap:8px;">
+          <button class="btn btn-secondary btn-sm" onclick="undoLast()">&#8617; Undo</button>
+          <button class="btn btn-yellow btn-sm" onclick="confirmNewGame()">&#128260; New Game</button>
+          <button class="btn btn-sm" id="holdBtn" style="background:var(--purple);color:white;" onclick="toggleHoldMode()">&#129318; Hold Man</button>
+        </div>
+      </div>
+    </div>
+    <div class="card" id="waitCard" style="display:none;">
+      <h3>&#9203; Waiting List</h3>
+      <div class="waitList" id="waitList"></div>
+    </div>
+    <div class="card">
+      <h3>&#128220; Score History</h3>
+      <div id="scoreHistory" class="text-muted" style="font-size:0.85rem;max-height:200px;overflow-y:auto;">No scores yet.</div>
+    </div>
+  </div>
+
+  <div id="tab-stats" class="tabContent">
+    <div class="card">
+      <h3>&#128269; Filter Stats</h3>
+      <div class="filterRow">
+        <div class="filterGroup"><label>From Date</label><input type="date" id="filterFrom" onchange="renderStats()"/></div>
+        <div class="filterGroup"><label>To Date</label><input type="date" id="filterTo" onchange="renderStats()"/></div>
+        <button class="btn btn-secondary btn-sm" onclick="clearFilter()">Clear</button>
+        <button class="btn btn-primary btn-sm" onclick="renderStats()">Apply</button>
+      </div>
+    </div>
+    <div class="card">
+      <h3>&#127942; Leaderboard</h3>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead><tr>
+            <th onclick="sortTable('rank')">#</th>
+            <th onclick="sortTable('name')">Player <span class="sortArrow" id="sort-name"></span></th>
+            <th onclick="sortTable('wins')">Wins <span class="sortArrow" id="sort-wins">&#9660;</span></th>
+            <th onclick="sortTable('games')">Games <span class="sortArrow" id="sort-games"></span></th>
+            <th onclick="sortTable('winRate')">Win% <span class="sortArrow" id="sort-winRate"></span></th>
+            <th onclick="sortTable('totalPoints')">Total Pts <span class="sortArrow" id="sort-totalPoints"></span></th>
+            <th onclick="sortTable('avgScore')">Avg Score <span class="sortArrow" id="sort-avgScore"></span></th>
+            <th onclick="sortTable('bestGame')">Best Game <span class="sortArrow" id="sort-bestGame"></span></th>
+          </tr></thead>
+          <tbody id="leaderBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div id="tab-calendar" class="tabContent">
+    <div class="card">
+      <div class="calHeader">
+        <button class="btn btn-secondary btn-sm" onclick="changeMonth(-1)">&#9664;</button>
+        <h2 id="calMonthLabel"></h2>
+        <button class="btn btn-secondary btn-sm" onclick="changeMonth(1)">&#9654;</button>
+      </div>
+      <div class="calGrid" id="calGrid"></div>
+    </div>
+  </div>
+
+  <div id="tab-admin" class="tabContent">
+    <div class="card">
+      <h3>&#128101; Player Management</h3>
+      <div class="flex mb">
+        <input type="text" id="newPlayerName" placeholder="Player name / nickname" style="flex:1;"/>
+        <input type="color" id="newPlayerColor" value="#e94560" style="width:44px;height:38px;padding:2px;border-radius:8px;cursor:pointer;flex-shrink:0;"/>
+        <button class="btn btn-primary" onclick="addPlayer()">Add</button>
+      </div>
+      <div class="playerList" id="playerList"></div>
+    </div>
+    <div class="card">
+      <h3>&#128272; Change PINs</h3>
+      <div class="flex flex-wrap">
+        <div style="flex:1;min-width:200px;"><label class="text-muted">New Admin PIN</label><input type="password" id="newAdminPin" placeholder="New admin PIN" class="mt"/></div>
+        <div style="flex:1;min-width:200px;"><label class="text-muted">New User PIN</label><input type="password" id="newUserPin" placeholder="New user PIN" class="mt"/></div>
+      </div>
+      <button class="btn btn-primary mt" onclick="savePins()">Save PINs</button>
+    </div>
+    <div class="card">
+      <h3>&#128295; Firebase Config</h3>
+      <p class="text-muted mb">Update your Firebase connection settings.</p>
+      <button class="btn btn-secondary btn-sm" onclick="reconfigureFirebase()">Reconfigure Firebase</button>
+    </div>
+    <div class="card">
+      <h3>&#128465;&#65039; Danger Zone</h3>
+      <div class="flex flex-wrap">
+        <button class="btn btn-red btn-sm" onclick="clearAllGames()">Clear All Games</button>
+        <button class="btn btn-red btn-sm" onclick="clearAllPlayers()">Clear All Players</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="dayModal" style="display:none;">
+  <div class="modalBox">
+    <button class="modalClose" onclick="closeDayModal()">&#10005;</button>
+    <h3 id="dayModalTitle"></h3>
+    <div id="dayModalContent"></div>
+  </div>
+</div>
+
+<div class="modal" id="confirmModal" style="display:none;">
+  <div class="modalBox" style="max-width:340px;text-align:center;">
+    <h3 id="confirmTitle">Are you sure?</h3>
+    <p class="text-muted mt mb" id="confirmMsg"></p>
+    <div class="flex mt" style="justify-content:center;">
+      <button class="btn btn-secondary" onclick="closeConfirm()">Cancel</button>
+      <button class="btn btn-red" id="confirmOkBtn">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<div id="winnerBanner">
+  <h1 id="winnerText">&#127942; Winner!</h1>
+  <p id="winnerSub"></p>
+  <button class="btn btn-primary mt" onclick="closeWinner()">&#128260; New Game</button>
+</div>
+
+<div id="toast"></div>
+
+<script type="module">
+import{initializeApp}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import{getDatabase,ref,set,update,push,remove,onValue,get}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+let db=null,fbApp=null;
+let players={},games={},currentGame=null,settings={adminPin:'12345',userPin:'0000'};
+let appRole=null,selectedSeats=[],holdMode=false;
+let sortCol='wins',sortDir=-1;
+let calMonth=new Date().getMonth(),calYear=new Date().getFullYear();
+let winnerShown=false;
+
+function setLoading(p){const b=document.getElementById('loadingBar');b.style.width=p+'%';if(p>=100)setTimeout(()=>b.style.width='0%',400);}
+function setSyncDot(s){const d=document.getElementById('syncDot');d.className='';d.classList.add(s);}
+
+function getSavedConfig(){try{return JSON.parse(localStorage.getItem('fbConfig')||'null');}catch{return null;}}
+
+function saveFirebaseConfig(){
+  const cfg={
+    apiKey:document.getElementById('cfg_apiKey').value.trim(),
+    authDomain:document.getElementById('cfg_authDomain').value.trim(),
+    databaseURL:document.getElementById('cfg_databaseURL').value.trim(),
+    projectId:document.getElementById('cfg_projectId').value.trim(),
+    appId:document.getElementById('cfg_appId').value.trim(),
+  };
+  const missing=Object.entries(cfg).filter(([k,v])=>!v).map(([k])=>k);
+  if(missing.length){document.getElementById('setupError').textContent='Please fill in: '+missing.join(', ');return;}
+  localStorage.setItem('fbConfig',JSON.stringify(cfg));
+  document.getElementById('setupError').textContent='';
+  initFirebase(cfg);
+}
+window.saveFirebaseConfig=saveFirebaseConfig;
+
+function reconfigureFirebase(){localStorage.removeItem('fbConfig');location.reload();}
+window.reconfigureFirebase=reconfigureFirebase;
+
+function initFirebase(cfg){
+  try{
+    setLoading(20);
+    if(!fbApp)fbApp=initializeApp(cfg);
+    db=getDatabase(fbApp);
+    setLoading(50);
+    const sRef=ref(db,'settings');
+    get(sRef).then(snap=>{
+      if(!snap.exists())set(sRef,{adminPin:'12345',userPin:'0000'});
+      setLoading(80);startListeners();setLoading(100);setSyncDot('synced');
+      document.getElementById('setupScreen').style.display='none';
+      document.getElementById('pinOverlay').style.display='flex';
+    }).catch(err=>{
+      setSyncDot('error');
+      document.getElementById('setupError').textContent='Firebase error: '+err.message+'. Check config & database rules.';
+      document.getElementById('setupScreen').style.display='flex';
+    });
+  }catch(err){
+    setSyncDot('error');
+    document.getElementById('setupError').textContent='Error: '+err.message;
+    document.getElementById('setupScreen').style.display='flex';
+  }
+}
+
+function startListeners(){
+  onValue(ref(db,'players'),snap=>{players=snap.val()||{};if(appRole){renderGame();renderStats();renderCalendar();renderAdmin();}});
+  onValue(ref(db,'games'),snap=>{games=snap.val()||{};if(appRole){renderStats();renderCalendar();}});
+  onValue(ref(db,'currentGame'),snap=>{
+    currentGame=snap.val()||null;
+    if(appRole){
+      renderGame();
+      if(currentGame&&!winnerShown&&currentGame.winner&&players[currentGame.winner]){
+        winnerShown=true;showWinner(currentGame.winner);
+      }
+      if(!currentGame)winnerShown=false;
+    }
+  });
+  onValue(ref(db,'settings'),snap=>{if(snap.exists())settings=snap.val();});
+}
+
+let pinInput='',selectedRole='admin';
+function selectRole(r){
+  selectedRole=r;
+  document.getElementById('roleAdmin').classList.toggle('active',r==='admin');
+  document.getElementById('roleUser').classList.toggle('active',r==='user');
+  pinInput='';updateDots();document.getElementById('pinError').textContent='';
+}
+window.selectRole=selectRole;
+function pinPress(d){if(pinInput.length>=5)return;pinInput+=d;updateDots();if(pinInput.length===5)setTimeout(checkPin,200);}
+window.pinPress=pinPress;
+function pinDel(){pinInput=pinInput.slice(0,-1);updateDots();}window.pinDel=pinDel;
+function pinClear(){pinInput='';updateDots();}window.pinClear=pinClear;
+function updateDots(){for(let i=0;i<5;i++)document.getElementById('d'+i).classList.toggle('filled',i<pinInput.length);}
+function checkPin(){
+  const aPin=(settings.adminPin||'12345').toString();
+  const uPin=(settings.userPin||'0000').toString();
+  if(selectedRole==='admin'&&pinInput===aPin){appRole='admin';enterApp();}
+  else if(selectedRole==='user'&&pinInput===uPin){appRole='user';enterApp();}
+  else{document.getElementById('pinError').textContent='Incorrect PIN. Try again.';pinInput='';updateDots();}
+}
+function enterApp(){
+  document.getElementById('pinOverlay').style.display='none';
+  document.getElementById('app').style.display='block';
+  document.getElementById('tabBtnAdmin').style.display=appRole==='admin'?'':'none';
+  renderGame();renderStats();renderCalendar();
+  if(appRole==='admin')renderAdmin();
+}
+
+function showTab(t,btn){
+  document.querySelectorAll('.tabContent').forEach(el=>el.classList.remove('active'));
+  document.querySelectorAll('.tabBtn').forEach(el=>el.classList.remove('active'));
+  document.getElementById('tab-'+t).classList.add('active');
+  if(btn)btn.classList.add('active');
+  if(t==='stats')renderStats();
+  if(t==='calendar')renderCalendar();
+  if(t==='admin')renderAdmin();
+  if(t==='game')renderGame();
+}
+window.showTab=showTab;
+
+function addPlayer(){
+  const name=document.getElementById('newPlayerName').value.trim();
+  const color=document.getElementById('newPlayerColor').value;
+  if(!name)return toast('Enter a player name');
+  setSyncDot('syncing');
+  const nr=push(ref(db,'players'));
+  set(nr,{name,color,createdAt:Date.now()}).then(()=>{
+    document.getElementById('newPlayerName').value='';setSyncDot('synced');toast('Player added: '+name);
+  }).catch(e=>{setSyncDot('error');toast('Error: '+e.message);});
+}
+window.addPlayer=addPlayer;
+
+function removePlayer(id){
+  showConfirm('Remove Player','Remove '+players[id].name+'?',()=>{
+    setSyncDot('syncing');
+    remove(ref(db,'players/'+id)).then(()=>{setSyncDot('synced');toast('Player removed.');})
+    .catch(e=>{setSyncDot('error');toast('Error: '+e.message);});
+  });
+}
+window.removePlayer=removePlayer;
+
+function updatePlayerColor(id,color){
+  setSyncDot('syncing');
+  update(ref(db,'players/'+id),{color}).then(()=>setSyncDot('synced'))
+  .catch(e=>{setSyncDot('error');toast('Error: '+e.message);});
+}
+window.updatePlayerColor=updatePlayerColor;
+
+function renderAdmin(){
+  if(appRole!=='admin')return;
+  const list=document.getElementById('playerList');
+  const ids=Object.keys(players);
+  if(!ids.length){list.innerHTML='<p class="text-muted">No players yet.</p>';return;}
+  list.innerHTML=ids.map(id=>{
+    const p=players[id];
+    return '<div class="playerRow"><input type="color" value="'+p.color+'" class="colorPicker" onchange="updatePlayerColor(''+id+'',this.value)" title="Change color"/><span style="flex:1;font-weight:600;">'+p.name+'</span><button class="btn btn-red btn-sm" onclick="removePlayer(''+id+'')">Remove</button></div>';
+  }).join('');
+}
+
+function savePins(){
+  const a=document.getElementById('newAdminPin').value.trim();
+  const u=document.getElementById('newUserPin').value.trim();
+  if(!a&&!u)return toast('Enter at least one PIN');
+  const upd={};if(a)upd.adminPin=a;if(u)upd.userPin=u;
+  setSyncDot('syncing');
+  update(ref(db,'settings'),upd).then(()=>{
+    setSyncDot('synced');toast('PINs updated!');
+    document.getElementById('newAdminPin').value='';
+    document.getElementById('newUserPin').value='';
+  }).catch(e=>{setSyncDot('error');toast('Error: '+e.message);});
+}
+window.savePins=savePins;
+
+function clearAllGames(){
+  showConfirm('Clear All Games','Delete ALL game history? Cannot be undone.',()=>{
+    setSyncDot('syncing');
+    Promise.all([remove(ref(db,'games')),remove(ref(db,'currentGame'))])
+    .then(()=>{setSyncDot('synced');toast('All games cleared.');})
+    .catch(e=>{setSyncDot('error');toast('Error: '+e.message);});
+  });
+}
+window.clearAllGames=clearAllGames;
+
+function clearAllPlayers(){
+  showConfirm('Clear All Players','Remove ALL players and games? Cannot be undone.',()=>{
+    setSyncDot('syncing');
+    Promise.all([remove(ref(db,'players')),remove(ref(db,'games')),remove(ref(db,'currentGame'))])
+    .then(()=>{setSyncDot('synced');toast('All players removed.');})
+    .catch(e=>{setSyncDot('error');toast('Error: '+e.message);});
+  });
+}
+window.clearAllPlayers=clearAllPlayers;
+
+function renderGame(){
+  const ids=Object.keys(players);
+  const picker=document.getElementById('seatPicker');
+  if(!picker)return;
+  const seated=currentGame?currentGame.seats||[]:selectedSeats;
+  picker.innerHTML=ids.map(id=>{
+    const p=players[id];const sel=seated.includes(id);
+    return '<button class="btn btn-sm" id="pick_'+id+'" style="background:'+(sel?p.color:'var(--card2)')+';color:'+(sel?'#000':'var(--text)')+';border:2px solid '+p.color+';margin:3px;" onclick="toggleSeat(''+id+'')">'+p.name+'</button>';
+  }).join('');
+  if(currentGame){
+    document.getElementById('seatSetup').style.display='none';
+    document.getElementById('gameBoard').style.display='block';
+    renderSeats();renderWaitList();renderHistory();
+  }else{
+    document.getElementById('seatSetup').style.display='block';
+    document.getElementById('gameBoard').style.display='none';
+    document.getElementById('waitCard').style.display='none';
+    renderHistory();
+  }
+}
+
+function toggleSeat(id){
+  if(currentGame)return;
+  const idx=selectedSeats.indexOf(id);
+  if(idx>=0)selectedSeats.splice(idx,1);
+  else if(selectedSeats.length<4)selectedSeats.push(id);
+  else{toast('Max 4 players per game');return;}
+  Object.keys(players).forEach(pid=>{
+    const btn=document.getElementById('pick_'+pid);if(!btn)return;
+    const p=players[pid];const sel=selectedSeats.includes(pid);
+    btn.style.background=sel?p.color:'var(--card2)';btn.style.color=sel?'#000':'var(--text)';
+  });
+}
+window.toggleSeat=toggleSeat;
+
+function startGame(){
+  if(selectedSeats.length<2)return toast('Select at least 2 players');
+  const scores={},onBoard={};
+  selectedSeats.forEach(id=>{scores[id]=0;onBoard[id]=false;});
+  setSyncDot('syncing');
+  set(ref(db,'currentGame'),{seats:selectedSeats,scores,onBoard,holdMan:null,history:[],winner:null,startedAt:Date.now()})
+  .then(()=>{selectedSeats=[];setSyncDot('synced');toast('Game started!');})
+  .catch(e=>{setSyncDot('error');toast('Error: '+e.message);});
+}
+window.startGame=startGame;
+
+function renderSeats(){
+  if(!currentGame)return;
+  const{seats,scores,holdMan,onBoard}=currentGame;
+  const grid=document.getElementById('seatsGrid');if(!grid)return;
+  const onBoardIds=seats.filter(id=>onBoard&&onBoard[id]);
+  let lowMan=null;
+  if(onBoardIds.length>1)lowMan=onBoardIds.reduce((a,b)=>(scores[a]||0)<(scores[b]||0)?a:b);
+  grid.innerHTML=seats.map(id=>{
+    const p=players[id];if(!p)return'';
+    const score=scores[id]||0;
+    const isLow=lowMan===id&&!currentGame.winner;
+    const isHold=holdMan===id;
+    const isWinner=currentGame.winner===id;
+    let badge='';
+    if(isWinner)badge='<span class="seatBadge badge-winner">WINNER</span>';
+    else if(isHold)badge='<span class="seatBadge badge-hold">HOLD</span>';
+    else if(isLow)badge='<span class="seatBadge badge-low">LOW</span>';
+    const canEdit=(appRole==='admin'||appRole==='user')&&!currentGame.winner;
+    return '<div class="seat '+(isWinner?'winner':'')+(isLow&&!isWinner?' lowman':'')+'" style="border-color:'+p.color+'60;">'+badge+'<div class="seatName" style="color:'+p.color+'">'+p.name+'</div><div class="seatScore">'+score+'</div>'+(onBoard&&!onBoard[id]&&score===0?'<div class="text-muted" style="font-size:0.75rem;">Not on board yet</div>':'')+(canEdit?'<div class="scoreInput"><input type="number" id="inp_'+id+'" placeholder="pts" min="0" step="5" onkeydown="if(event.key==='Enter')addScore(''+id+'')"/><button class="btn btn-primary btn-sm" onclick="addScore(''+id+'')">+</button></div>':'')+(holdMode&&canEdit?'<button class="btn btn-sm mt" style="background:var(--purple);color:white;width:100%;" onclick="setHoldMan(''+id+'')">Set Hold Man</button>':'')+'</div>';
+  }).join('');
+}
+
+function addScore(id){
+  if(!currentGame||currentGame.winner)return;
+  const inp=document.getElementById('inp_'+id);
+  let val=parseInt(inp.value);
+  if(isNaN(val)||val<0)return toast('Enter a valid score');
+  val=Math.round(val/5)*5;
+  if(!(currentGame.onBoard&&currentGame.onBoard[id])&&val<10)return toast('Need at least 10 to get on the board!');
+  const prev=currentGame.scores[id]||0;
+  const newScore=prev+val;
+  const newHistory=[...(currentGame.history||[]),{id,val,prev,ts:Date.now()}];
+  const updates={'currentGame/scores/'+id:newScore,'currentGame/onBoard/'+id:val>=10?true:(currentGame.onBoard[id]||false),'currentGame/history':newHistory};
+  if(newScore>=250){
+    updates['currentGame/winner']=id;
+    const today=new Date().toISOString().split('T')[0];
+    const ngRef=push(ref(db,'games'));
+    const gameLog={date:today,seats:currentGame.seats,scores:{...currentGame.scores,[id]:newScore},winner:id,timestamp:Date.now()};
+    setSyncDot('syncing');
+    Promise.all([update(ref(db),updates),set(ngRef,gameLog)])
+    .then(()=>setSyncDot('synced')).catch(e=>{setSyncDot('error');toast('Error: '+e.message);});
+  }else{
+    setSyncDot('syncing');
+    update(ref(db),updates).then(()=>setSyncDot('synced')).catch(e=>{setSyncDot('error');toast('Error: '+e.message);});
+  }
+  inp.value='';
+}
+window.addScore=addScore;
+
+function undoLast(){
+  if(!currentGame||!currentGame.history||!currentGame.history.length)return toast('Nothing to undo');
+  const hist=[...currentGame.history];const last=hist.pop();
+  const updates={'currentGame/scores/'+last.id:last.prev,'currentGame/history':hist,'currentGame/winner':null};
+  if(last.prev<10)updates['currentGame/onBoard/'+last.id]=false;
+  setSyncDot('syncing');
+  update(ref(db),updates).then(()=>{setSyncDot('synced');toast('Undone!');}).catch(e=>{setSyncDot('error');toast('Error: '+e.message);});
+}
+window.undoLast=undoLast;
+
+function setHoldMan(id){
+  setSyncDot('syncing');
+  update(ref(db,'currentGame'),{holdMan:id}).then(()=>{
+    setSyncDot('synced');holdMode=false;
+    document.getElementById('holdBtn').style.opacity='1';
+    toast('Hold Man set: '+players[id].name);
+  }).catch(e=>{setSyncDot('error');toast('Error: '+e.message);});
+}
+window.setHoldMan=setHoldMan;
+
+function toggleHoldMode(){
+  holdMode=!holdMode;
+  document.getElementById('holdBtn').style.opacity=holdMode?'0.6':'1';
+  toast(holdMode?'Click "Set Hold Man" on a seat':'Hold Man mode off');
+  renderSeats();
+}
+window.toggleHoldMode=toggleHoldMode;
+
+function renderHistory(){
+  const hist=currentGame?(currentGame.history||[]):[];
+  const el=document.getElementById('scoreHistory');if(!el)return;
+  if(!hist.length){el.textContent='No scores yet.';return;}
+  el.innerHTML=[...hist].reverse().map(h=>{
+    const p=players[h.id];
+    return '<div style="padding:3px 0;border-bottom:1px solid #222;"><span style="color:'+(p?p.color:'#fff')+'">'+(p?p.name:'?')+'</span> +'+h.val+' pts &rarr; <strong>'+((h.prev||0)+h.val)+'</strong></div>';
+  }).join('');
+}
+
+function renderWaitList(){
+  if(!currentGame)return;
+  const seated=currentGame.seats||[];
+  const waiting=Object.keys(players).filter(id=>!seated.includes(id));
+  const card=document.getElementById('waitCard');const list=document.getElementById('waitList');
+  if(!waiting.length){card.style.display='none';return;}
+  card.style.display='block';
+  list.innerHTML=waiting.map(id=>{
+    const p=players[id];
+    return '<div class="waitChip" style="border:1px solid '+p.color+';"><span style="color:'+p.color+'">'+p.name+'</span></div>';
+  }).join('');
+}
+
+function showWinner(id){
+  const p=players[id];if(!p)return;
+  document.getElementById('winnerText').textContent='Trophy '+p.name+' Wins!';
+  document.getElementById('winnerSub').textContent='Final score: '+((currentGame.scores||{})[id]||0)+' pts';
+  document.getElementById('winnerBanner').classList.add('show');
+}
+
+function closeWinner(){document.getElementById('winnerBanner').classList.remove('show');winnerShown=false;newGame();}
+window.closeWinner=closeWinner;
+
+function confirmNewGame(){showConfirm('New Game','End the current game and start fresh?',newGame);}
+window.confirmNewGame=confirmNewGame;
+
+function newGame(){
+  setSyncDot('syncing');
+  remove(ref(db,'currentGame')).then(()=>{selectedSeats=[];winnerShown=false;setSyncDot('synced');toast('Ready for new game!');})
+  .catch(e=>{setSyncDot('error');toast('Error: '+e.message);});
+}
+window.newGame=newGame;
+
+function getFilteredGames(){
+  const from=document.getElementById('filterFrom')?document.getElementById('filterFrom').value:'';
+  const to=document.getElementById('filterTo')?document.getElementById('filterTo').value:'';
+  return Object.values(games).filter(g=>{if(from&&g.date<from)return false;if(to&&g.date>to)return false;return true;});
+}
+
+function clearFilter(){document.getElementById('filterFrom').value='';document.getElementById('filterTo').value='';renderStats();}
+window.clearFilter=clearFilter;
+
+function computeStats(gameList){
+  const stats={};
+  Object.keys(players).forEach(id=>{stats[id]={wins:0,games:0,totalPoints:0,bestGame:0};});
+  gameList.forEach(g=>{
+    (g.seats||[]).forEach(id=>{
+      if(!stats[id])stats[id]={wins:0,games:0,totalPoints:0,bestGame:0};
+      stats[id].games++;
+      const sc=(g.scores||{})[id]||0;
+      stats[id].totalPoints+=sc;
+      if(sc>stats[id].bestGame)stats[id].bestGame=sc;
+      if(g.winner===id)stats[id].wins++;
+    });
+  });
+  return stats;
+}
+
+function sortTable(col){
+  if(sortCol===col)sortDir*=-1;else{sortCol=col;sortDir=-1;}
+  document.querySelectorAll('.sortArrow').forEach(el=>el.textContent='');
+  const arrow=document.getElementById('sort-'+col);
+  if(arrow)arrow.textContent=sortDir===-1?'▼':'▲';
+  renderStats();
+}
+window.sortTable=sortTable;
+
+function renderStats(){
+  const gameList=getFilteredGames();const stats=computeStats(gameList);
+  const ids=Object.keys(players);
+  let rows=ids.map(id=>{
+    const p=players[id];const s=stats[id]||{wins:0,games:0,totalPoints:0,bestGame:0};
+    return{id,name:p.name,color:p.color,wins:s.wins,games:s.games,winRate:s.games?Math.round(s.wins/s.games*100):0,totalPoints:s.totalPoints,avgScore:s.games?Math.round(s.totalPoints/s.games):0,bestGame:s.bestGame};
+  });
+  rows.sort((a,b)=>sortCol==='name'?sortDir*a.name.localeCompare(b.name):sortDir*(b[sortCol]-a[sortCol]));
+  const tbody=document.getElementById('leaderBody');if(!tbody)return;
+  if(!rows.length){tbody.innerHTML='<tr><td colspan="8" class="text-muted" style="padding:16px;">No players yet. Add players in the Admin tab.</td></tr>';return;}
+  tbody.innerHTML=rows.map((r,i)=>'<tr><td>'+(i+1)+'</td><td><span class="playerDot" style="background:'+r.color+'"></span>'+r.name+'</td><td><strong>'+r.wins+'</strong></td><td>'+r.games+'</td><td>'+r.winRate+'%</td><td>'+r.totalPoints+'</td><td>'+r.avgScore+'</td><td>'+r.bestGame+'</td></tr>').join('');
+}
+
+function changeMonth(dir){
+  calMonth+=dir;if(calMonth>11){calMonth=0;calYear++;}if(calMonth<0){calMonth=11;calYear--;}
+  renderCalendar();
+}
+window.changeMonth=changeMonth;
+
+function renderCalendar(){
+  const months=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const label=document.getElementById('calMonthLabel');if(label)label.textContent=months[calMonth]+' '+calYear;
+  const grid=document.getElementById('calGrid');if(!grid)return;
+  const days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  let html=days.map(d=>'<div class="calDayLabel">'+d+'</div>').join('');
+  const firstDay=new Date(calYear,calMonth,1).getDay();
+  const daysInMonth=new Date(calYear,calMonth+1,0).getDate();
+  const today=new Date().toISOString().split('T')[0];
+  const byDate={};
+  Object.values(games).forEach(g=>{if(!byDate[g.date])byDate[g.date]=[];byDate[g.date].push(g);});
+  for(let i=0;i<firstDay;i++)html+='<div class="calCell empty"></div>';
+  for(let d=1;d<=daysInMonth;d++){
+    const dateStr=calYear+'-'+String(calMonth+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+    const isToday=dateStr===today;
+    const dayGames=byDate[dateStr]||[];
+    const winnersHtml=dayGames.map(g=>{const p=players[g.winner];if(!p)return'';return'<div class="calWinner" style="background:'+p.color+'">'+p.name+'</div>';}).join('');
+    html+='<div class="calCell '+(isToday?'today':'')+'" onclick="openDayModal(''+dateStr+'')"><div class="calDayNum">'+d+'</div>'+winnersHtml+(dayGames.length>0?'<div style="font-size:0.65rem;color:var(--muted)">'+dayGames.length+' game'+(dayGames.length>1?'s':'')+'</div>':'')+'</div>';
+  }
+  grid.innerHTML=html;
+}
+
+function openDayModal(dateStr){
+  const dayGames=Object.values(games).filter(g=>g.date===dateStr);
+  document.getElementById('dayModalTitle').textContent='Date: '+dateStr;
+  if(!dayGames.length){document.getElementById('dayModalContent').innerHTML='<p class="text-muted">No games played this day.</p>';}
+  else{
+    document.getElementById('dayModalContent').innerHTML=dayGames.sort((a,b)=>(a.timestamp||0)-(b.timestamp||0)).map((g,i)=>{
+      const winner=players[g.winner];
+      const scores=(g.seats||[]).map(id=>{const p=players[id];return'<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #222;"><span style="color:'+(p?p.color:'#fff')+'">'+(p?p.name:'?')+'</span><strong>'+((g.scores||{})[id]||0)+'</strong></div>';}).join('');
+      return'<div style="margin-bottom:16px;"><div style="font-weight:700;margin-bottom:8px;">Game '+(i+1)+(winner?' &mdash; <span style="color:'+winner.color+'">'+winner.name+'</span>':'')+'</div>'+scores+'</div>';
+    }).join('');
+  }
+  document.getElementById('dayModal').style.display='flex';
+}
+window.openDayModal=openDayModal;
+
+function closeDayModal(){document.getElementById('dayModal').style.display='none';}
+window.closeDayModal=closeDayModal;
+
+let confirmCallback=null;
+function showConfirm(title,msg,cb){
+  document.getElementById('confirmTitle').textContent=title;
+  document.getElementById('confirmMsg').textContent=msg;
+  confirmCallback=cb;
+  document.getElementById('confirmModal').style.display='flex';
+  document.getElementById('confirmOkBtn').onclick=()=>{closeConfirm();if(confirmCallback)confirmCallback();};
+}
+function closeConfirm(){document.getElementById('confirmModal').style.display='none';}
+window.closeConfirm=closeConfirm;
+
+function toast(msg){
+  const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2800);
+}
+
+const savedCfg=getSavedConfig();
+if(savedCfg){initFirebase(savedCfg);}
+else{document.getElementById('setupScreen').style.display='flex';}
+</script>
+</body>
+</html>
